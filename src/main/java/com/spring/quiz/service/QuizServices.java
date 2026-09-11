@@ -3,6 +3,8 @@ package com.spring.quiz.service;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.HashSet;
+import java.util.Set;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -36,6 +38,9 @@ public class QuizServices {
     public ResponseEntity<List<QuestionWrapper>> getQuizQuestions(int id) {
 
         Optional<Quiz> quiz = quizDao.findById(id);
+        if (quiz.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
         // there must be que=estion Wrapper
         List<Question> QuestionFromDb = quiz.get().getQuestions();
         List<QuestionWrapper> QuestionsForUser = new ArrayList<>();
@@ -51,15 +56,28 @@ public class QuizServices {
 
     public ResponseEntity<Integer> getScore(int id, List<Response> response) {
 
-        Quiz quiz = quizDao.findById(id).get();
-        List<Question> QuestionFromDb = quiz.getQuestions();
-        int i = 0;
-        int count = 1;
+        Optional<Quiz> quiz = quizDao.findById(id);
+        if (quiz.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        if (response == null) {
+            return ResponseEntity.badRequest().build();
+        }
+        List<Question> questions = quiz.get().getQuestions();
+        Set<Integer> answeredIds = new HashSet<>();
+        int count = 0;
         for (Response r : response) {
-            // Optional<Question> QuestionWithRightAnswer = questionRepo.findById(r.getId());
-            
-            r.getResponse().equals(QuestionFromDb.get(i).getRightAnswer());
-            count++;
+            if (r == null || r.getResponse() == null || !answeredIds.add(r.getId())) {
+                return ResponseEntity.badRequest().build();
+            }
+            Optional<Question> question = questions.stream()
+                    .filter(q -> q.getId() == r.getId()).findFirst();
+            if (question.isEmpty()) {
+                return ResponseEntity.badRequest().build();
+            }
+            if (r.getResponse().equals(question.get().getRightAnswer())) {
+                count++;
+            }
         }
 
         return new ResponseEntity<>(count, HttpStatus.OK);
